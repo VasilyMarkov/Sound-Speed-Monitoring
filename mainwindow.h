@@ -2,6 +2,9 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QThread>
+#include "monitor.h"
+#include "qcustomplot.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -16,6 +19,10 @@ public:
     ~MainWindow();
 
 private:
+    Monitor* monitor_;
     Ui::MainWindow *ui;
+    QCustomPlot* channels_plot_;
+    void initPlot(QCustomPlot*);
+    void generateData(QVector<double>&, double);
 };
 #endif // MAINWINDOW_H
