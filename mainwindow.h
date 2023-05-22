@@ -17,12 +17,15 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
-
+public slots:
+    void receiveDataToPlot(const std::array<double, CHANNELS>&);
 private:
-    Monitor* monitor_;
     Ui::MainWindow *ui;
-    QCustomPlot* channels_plot_;
+    Monitor* monitor;
+    QThread* monitor_thread;
+    QCustomPlot* channels_plot;
+    sensor_channels sensors;
     void initPlot(QCustomPlot*);
-    void generateData(QVector<double>&, double);
+    void generateData(std::array<double, BUFFER_SIZE>&, double, double);
 };
 #endif // MAINWINDOW_H
