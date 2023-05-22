@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "monitor.h"
+#include <QTime>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), monitor_thread(new QThread())
@@ -24,6 +25,13 @@ MainWindow::MainWindow(QWidget *parent)
     for(auto& sensor:sensors) { //Заполняем данными все каналы сенсоров
        generateData(sensor, 0.5, 0);
     }
+
+//    generateData(sensors[0], 0.5, 0);
+//    generateData(sensors[1], 0.5, 0);
+
+//    for(auto i = 0; i < sensors[0].size(); ++i) {
+//        qDebug() << sensors[0][i] << sensors[1][i];
+//    }
     monitor = new Monitor(sensors);
     monitor->moveToThread(monitor_thread);
     connect(monitor_thread, &QThread::started, monitor, &Monitor::start);
@@ -38,12 +46,22 @@ MainWindow::~MainWindow()
 
 void MainWindow::receiveDataToPlot(const std::array<double, CHANNELS>& data)
 {
-    static size_t x = 0;
-    auto offset = 18;
-    for(size_t i=0; i < CHANNELS; ++i) {
-        channels_plot->graph(i)->addData(x, data[i]+offset-i*4);
+
+    static size_t index = 0;
+    static size_t global_x = 0;
+    std::array<std::array<double, CHANNELS>, 10> buffer;
+    buffer[index] = data;
+    const auto offset = 14;
+    if(index == 9) {
+        for(auto& element:buffer) {
+            for(size_t i=0; i < CHANNELS; ++i) {
+                channels_plot->graph(i)->addData(global_x, element[i]+offset-i*4);
+            }
+            global_x++;
+        }
+        index = 0;
     }
-    ++x;
+    ++index;
     channels_plot->replot();
 }
 
@@ -90,11 +108,12 @@ void MainWindow::generateData(std::array<double, BUFFER_SIZE>& data, double vari
         i += delta;
         delta += grow_coefficient/static_cast<double>(data.size());
     }
-    std::mt19937 engine{};
+    std::random_device rd;
+    std::mt19937 engine(rd());
     std::normal_distribution<> distr(0,variance);
-
+    QRandomGenerator gen;
     for(auto& i:data) {
-         i += distr(engine);
+         i += QRandomGenerator::global()->generateDouble();
     }
     std::transform(std::begin(data), std::end(data), std::begin(trend), std::begin(data), std::plus<double>());
 }

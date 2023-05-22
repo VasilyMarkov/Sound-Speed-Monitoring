@@ -27,6 +27,7 @@ void Monitor::update()
     for(size_t i = 0; i < CHANNELS; ++i) {
         buffer[i] = sensors_[i][index];
     }
+    //qDebug() << sensors_[0][index] << sensors_[1][index] << sensors_[6][index] << sensors_[7][index];
     if(index < 1000)
         emit sendChannelDataToPlot(buffer);
     ++index;

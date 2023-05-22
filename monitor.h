@@ -6,6 +6,7 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QDebug>
+
 constexpr size_t BUFFER_SIZE = 1000;
 constexpr size_t CHANNELS = 8;
 
