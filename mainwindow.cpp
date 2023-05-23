@@ -7,12 +7,16 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), monitor_thread(new QThread())
 {
     ui->setupUi(this); 
+    setFixedHeight(1350);
+    setFixedWidth(2100);
     channels_plot = ui->plot;
     initPlot(channels_plot);
     for(size_t i = 0; i < CHANNELS; ++i) {
         channels_plot->addGraph();
     }
+    channels_plot->addGraph();
     channels_plot->yAxis->setTickLabels(true);
+    //channels_plot->graph(ch1)->setPen(QPen(QColor(Qt::gray), 1.5));
     channels_plot->graph(ch1)->setPen(QPen(QColor(247, 79, 79), 1.5));
     channels_plot->graph(ch2)->setPen(QPen(QColor(247, 79, 200), 1.5));
     channels_plot->graph(ch3)->setPen(QPen(QColor(160, 79, 247), 1.5));
@@ -22,20 +26,13 @@ MainWindow::MainWindow(QWidget *parent)
     channels_plot->graph(ch7)->setPen(QPen(QColor(231, 247, 79), 1.5));
     channels_plot->graph(ch8)->setPen(QPen(QColor(247, 141, 79), 1.5));
 
-    for(auto& sensor:sensors) { //Заполняем данными все каналы сенсоров
-       generateData(sensor, 0.5, 0);
-    }
 
-//    generateData(sensors[0], 0.5, 0);
-//    generateData(sensors[1], 0.5, 0);
-
-//    for(auto i = 0; i < sensors[0].size(); ++i) {
-//        qDebug() << sensors[0][i] << sensors[1][i];
-//    }
-    monitor = new Monitor(sensors);
+    monitor = new Monitor();
     monitor->moveToThread(monitor_thread);
     connect(monitor_thread, &QThread::started, monitor, &Monitor::start);
-    connect(monitor, &Monitor::sendChannelDataToPlot, this, &MainWindow::receiveDataToPlot, Qt::QueuedConnection);
+    //connect(monitor, &Monitor::sendChannelDataToPlot, this, &MainWindow::receiveDataToPlot, Qt::QueuedConnection);
+    connect(monitor, &Monitor::sendAverage, this, &MainWindow::receiveAverageData, Qt::QueuedConnection);
+    connect(monitor, &Monitor::sendVector, this, &MainWindow::receiveVector, Qt::QueuedConnection);
     monitor_thread->start();
 }
 
@@ -44,24 +41,43 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::receiveDataToPlot(const std::array<double, CHANNELS>& data)
+void MainWindow::receiveDataToPlot(const QVector<double>& data)
 {
 
-    static size_t index = 0;
-    static size_t global_x = 0;
-    std::array<std::array<double, CHANNELS>, 10> buffer;
-    buffer[index] = data;
-    const auto offset = 14;
-    if(index == 9) {
-        for(auto& element:buffer) {
-            for(size_t i=0; i < CHANNELS; ++i) {
-                channels_plot->graph(i)->addData(global_x, element[i]+offset-i*4);
-            }
-            global_x++;
-        }
-        index = 0;
+
+//    static size_t index = 0;
+//    static size_t global_x = 0;
+//    QVector<double> buffer;
+//    buffer[index] = data;
+//    const auto offset = 14;
+//    if(index == 9) {
+//        for(auto& element:buffer) {
+//            for(size_t i=0; i < CHANNELS; ++i) {
+//                channels_plot->graph(i)->addData(global_x, element[i]+offset-i*4);
+//            }
+//            global_x++;
+//        }
+//        index = 0;
+//    }
+//    ++index;
+//    channels_plot->replot();
+//    qDebug() << channels_plot->replotTime(true);
+}
+
+void MainWindow::receiveAverageData(double value)
+{
+//    static size_t x = 0;
+//    channels_plot->graph(ch1)->addData(x++, value);
+//    channels_plot->replot();
+}
+
+void MainWindow::receiveVector(const QVector<double>& data, size_t channel)
+{
+    static size_t x = 0;
+    for(size_t i=0; i < data.size(); ++i) {
+        channels_plot->graph(channel)->addData(x, data[i]);
+        x++;
     }
-    ++index;
     channels_plot->replot();
 }
 
@@ -84,7 +100,7 @@ void MainWindow::initPlot(QCustomPlot* plot) {
     plot->yAxis->grid()->setZeroLinePen(Qt::NoPen);
     plot->xAxis->setUpperEnding(QCPLineEnding::esSpikeArrow);
     plot->yAxis->setUpperEnding(QCPLineEnding::esSpikeArrow);
-    plot->yAxis->setRange(-20,20);
+    plot->yAxis->setRange(-5,5);
     plot->xAxis->setRange(0,BUFFER_SIZE);
     QLinearGradient plotGradient;
     plotGradient.setStart(0, 0);
@@ -100,21 +116,4 @@ void MainWindow::initPlot(QCustomPlot* plot) {
     plot->axisRect()->setBackground(axisRectGradient);
 }
 
-void MainWindow::generateData(std::array<double, BUFFER_SIZE>& data, double variance, double grow_coefficient) //Генерация данных с шумом и трендом
-{
-    QVector<double> trend(data.size(), 0);
-    double delta{0};
-    for(auto& i:trend) {
-        i += delta;
-        delta += grow_coefficient/static_cast<double>(data.size());
-    }
-    std::random_device rd;
-    std::mt19937 engine(rd());
-    std::normal_distribution<> distr(0,variance);
-    QRandomGenerator gen;
-    for(auto& i:data) {
-         i += QRandomGenerator::global()->generateDouble();
-    }
-    std::transform(std::begin(data), std::end(data), std::begin(trend), std::begin(data), std::plus<double>());
-}
 
