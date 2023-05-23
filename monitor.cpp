@@ -9,58 +9,48 @@ Monitor::Monitor():timer(new QTimer(this))
     sensors.resize(8);
     for(auto& sensor:sensors) { //Заполняем данными все каналы сенсоров
         sensor.resize(1000);
-        generateData(sensor, 0.5, 3);
+        //sensor.fill(600);
+        generateData(sensor, 0.5);
     }
-    t_buffer.resize(1000);
-    y_fit_t.resize(1000);
-    test_vector.resize(50);
-    QVector<double> test;
-    QVector<double> t_test(50);
-    std::iota(std::begin(t_test), std::end(t_test), 0);
-    QVector<double> y_test(50);
-    test = sensors[ch1];
-    test.resize(50);
-    //qDebug() << leastSquares(test, t_test, y_test);
-    test_vector = y_test;
-
-
-    std::iota(std::begin(t_buffer), std::end(t_buffer), 0);
-    qDebug() << leastSquares(sensors[ch1], t_buffer, y_fit_t);
+    expectedSpeedData.resize(BUFFER_SIZE);
+    expectedSpeedData.fill(EXPECTED_SPEED);
+    generateData(expectedSpeedData, 0.5);
+    //generateTrend(sensors[ch1], 10, 0, BUFFER_SIZE-1);
 
     x_buffer.resize(50);
     buffer.resize(50);
     average_y_fit_buffer.resize(50);
     std::iota(std::begin(x_buffer), std::end(x_buffer), 0);
 
-}
-
-double Monitor::channelSpeedAverage(double ch1,
-                                    double ch2,
-                                    double ch3,
-                                    double ch4,
-                                    double ch5,
-                                    double ch6,
-                                    double ch7,
-                                    double ch8)
-{
-    std::array<double, 8> channels = {ch1, ch2, ch3, ch4, ch5, ch6, ch7, ch8};
-    return std::accumulate(std::begin(channels), std::end(channels), 0.0)/8;
+    channels_buffer.resize(8);
 }
 
 void Monitor::update()
 {
     QMutexLocker locker(&mutex);
-    auto avg = channelSpeedAverage(sensors[ch1][index],
-                                   sensors[ch2][index],
-                                   sensors[ch3][index],
-                                   sensors[ch4][index],
-                                   sensors[ch5][index],
-                                   sensors[ch6][index],
-                                   sensors[ch7][index],
-                                   sensors[ch8][index]);
-    estimateDataTrend(avg);
-//    emit sendAverage(avg);
+    QVector<double> sensors_buffer = {sensors[ch1][index],
+                                      sensors[ch2][index],
+                                      sensors[ch3][index],
+                                      sensors[ch4][index],
+                                      sensors[ch5][index],
+                                      sensors[ch6][index],
+                                      sensors[ch7][index],
+                                      sensors[ch8][index]};
 
+    average_channels = std::accumulate(std::begin(sensors_buffer), std::end(sensors_buffer), 0.0)/CHANNELS;
+
+    speedEst(sensors_buffer[0]);
+
+    //estimateChannelsSpeed(sensors_buffer);
+
+
+    estimateDataTrend(average_channels);
+    emit sendAverage(average_channels);
+    if(index == 1) {
+        for(auto i = 0; i < sensors.size(); ++i) {
+            emit sendVector(sensors[i], i);
+        }
+    }
     if(index == 999) {
         qDebug() << std::accumulate(std::begin(y_fit_test), std::end(y_fit_test), 0.0)/y_fit_test.size();
         timer->stop();
@@ -91,40 +81,82 @@ bool Monitor::estimateDataTrend(double value) {
     static size_t cnt{0};
     buffer[cnt] = value;
     if(cnt == 49) {
-        //filter(buffer);
+        filter(buffer, 9);
         QVector<double> y_fit(50);
-        avg_fit += leastSquares(buffer, x_buffer, y_fit);
-        avg_fit /=2;
+        avg_fit = leastSquares(buffer, x_buffer, y_fit);
         y_fit_test.push_back(leastSquares(buffer, x_buffer, y_fit));
         qDebug() << avg_fit << "avg";
+        bool trend_detection;
+        if(std::abs(avg_fit) > trend_treshold) trend_detection = true;
+        else trend_detection = false;
+        emit sendEstimateTrend(trend_detection);
         emit sendVector(buffer, ch1);
         cnt = 0;
     }
     else cnt++;
-
 }
 
-void Monitor::generateData(QVector<double>& data, double variance, double grow_coefficient) //Генерация данных с шумом и трендом
+void Monitor::generateTrend(QVector<double>& data, double grow_coefficient, size_t begin, size_t end)
 {
-    QVector<double> trend(data.size(), 0);
+    assert(begin <= end && end < BUFFER_SIZE);
+
+    QVector<double> trend(end-begin, 0);
     double delta{0};
     for(auto& i:trend) {
         i += delta;
-        delta += grow_coefficient/static_cast<double>(data.size());
+        delta += grow_coefficient/static_cast<double>(end-begin);
         i -= 0.5;
     }
+    std::transform(std::begin(data)+begin, std::begin(data)+end, std::begin(trend), std::begin(data)+begin, std::plus<double>());
+}
+
+void Monitor::generateData(QVector<double>& data, double variance)
+{
     for(auto& i:data) {
          i += QRandomGenerator::global()->generateDouble();
     }
-    std::transform(std::begin(data), std::end(data), std::begin(trend), std::begin(data), std::plus<double>());
 }
 
-void Monitor::filter(QVector<double>& data)
+void Monitor::filter(QVector<double>& data, size_t window)
 {
-    const size_t window_size{5};
-    for(auto i = 0; i < data.size(); ++i) {
-        data[i] = std::accumulate(std::begin(data)+i, std::begin(data)+i+window_size, 0.0)/window_size;
+    assert(window > 0 && !data.empty());
+
+    for(auto i = 0; i < data.size()-window; ++i) {
+        data[i] = std::accumulate(std::begin(data)+i, std::begin(data)+i+window, 0.0)/window;
     }
+    for(auto i = data.size()-1; i > data.size()-window; --i) {
+        data[i] = std::accumulate(std::begin(data)+i-window, std::begin(data)+i, 0.0)/window;
+    }
+}
+
+void Monitor::estimateChannelsSpeed(QVector<double>& channels)
+{
+    assert(channels.size() != CHANNELS);
+
+    static size_t cnt = 0;
+    const median_filter_size = 7;
+    channels_buffer.push_back(channels);
+    QVector<double> buffer(median_filter_size);
+    if(cnt == median_filter_size-1) {
+        for(auto i = 0; i < median_filter_size; ++i) {
+
+        }
+    }
+    cnt++;
+}
+
+double Monitor::speedEst(double value)
+{
+    static size_t cnt = 0;
+    const median_filter_size = 7;
+    static QVector<double> buffer(median_filter_size, 0);
+    buffer[cnt] = value;
+    if(cnt == median_filter_size-1) {
+        std::sort(std::begin(buffer), std::end(buffer));
+        cnt = 0;
+        return buffer[buffer.size()/2];
+    }
+    cnt++;
 }
 
 void Monitor::start() const

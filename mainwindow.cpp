@@ -9,23 +9,33 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this); 
     setFixedHeight(1350);
     setFixedWidth(2100);
+    channels = {ui->ch1, ui->ch2, ui->ch3, ui->ch4, ui->ch5, ui->ch6, ui->ch7, ui->ch8};
     channels_plot = ui->plot;
     initPlot(channels_plot);
     for(size_t i = 0; i < CHANNELS; ++i) {
         channels_plot->addGraph();
     }
-    channels_plot->addGraph();
     channels_plot->yAxis->setTickLabels(true);
     //channels_plot->graph(ch1)->setPen(QPen(QColor(Qt::gray), 1.5));
-    channels_plot->graph(ch1)->setPen(QPen(QColor(247, 79, 79), 1.5));
-    channels_plot->graph(ch2)->setPen(QPen(QColor(247, 79, 200), 1.5));
-    channels_plot->graph(ch3)->setPen(QPen(QColor(160, 79, 247), 1.5));
-    channels_plot->graph(ch4)->setPen(QPen(QColor(79, 96, 247), 1.5));
-    channels_plot->graph(ch5)->setPen(QPen(QColor(79, 191, 247), 1.5));
-    channels_plot->graph(ch6)->setPen(QPen(QColor(82, 247, 79), 1.5));
-    channels_plot->graph(ch7)->setPen(QPen(QColor(231, 247, 79), 1.5));
-    channels_plot->graph(ch8)->setPen(QPen(QColor(247, 141, 79), 1.5));
+    channels_plot->graph(ch1)->setPen(QPen(QColor(212, 62, 250), 2));
+    channels_plot->graph(ch1)->setName("Channel 1");
+    channels_plot->graph(ch2)->setPen(QPen(QColor(106, 62, 250), 2));
+    channels_plot->graph(ch2)->setName("Channel 2");
+    channels_plot->graph(ch3)->setPen(QPen(QColor(62, 119, 250), 2));
+    channels_plot->graph(ch3)->setName("Channel 3");
+    channels_plot->graph(ch4)->setPen(QPen(QColor(62, 250, 250), 2));
+    channels_plot->graph(ch4)->setName("Channel 4");
+    channels_plot->graph(ch5)->setPen(QPen(QColor(62, 250, 172), 2));
+    channels_plot->graph(ch5)->setName("Channel 5");
+    channels_plot->graph(ch6)->setPen(QPen(QColor(82, 247, 79), 2));
+    channels_plot->graph(ch6)->setName("Channel 6");
+    channels_plot->graph(ch7)->setPen(QPen(QColor(62, 250, 100), 2));
+    channels_plot->graph(ch7)->setName("Channel 7");
+    channels_plot->graph(ch8)->setPen(QPen(QColor(156, 250, 62), 2));
+    channels_plot->graph(ch8)->setName("Channel 8");
 
+    line = new QCPItemLine(channels_plot);
+    line->setPen(QPen(QColor(250, 250, 62), 1));
 
     monitor = new Monitor();
     monitor->moveToThread(monitor_thread);
@@ -33,6 +43,7 @@ MainWindow::MainWindow(QWidget *parent)
     //connect(monitor, &Monitor::sendChannelDataToPlot, this, &MainWindow::receiveDataToPlot, Qt::QueuedConnection);
     connect(monitor, &Monitor::sendAverage, this, &MainWindow::receiveAverageData, Qt::QueuedConnection);
     connect(monitor, &Monitor::sendVector, this, &MainWindow::receiveVector, Qt::QueuedConnection);
+    connect(monitor, &Monitor::sendEstimateTrend, this, &MainWindow::receiveEstimateTrend, Qt::QueuedConnection);
     monitor_thread->start();
 }
 
@@ -43,8 +54,6 @@ MainWindow::~MainWindow()
 
 void MainWindow::receiveDataToPlot(const QVector<double>& data)
 {
-
-
 //    static size_t index = 0;
 //    static size_t global_x = 0;
 //    QVector<double> buffer;
@@ -69,16 +78,28 @@ void MainWindow::receiveAverageData(double value)
 //    static size_t x = 0;
 //    channels_plot->graph(ch1)->addData(x++, value);
 //    channels_plot->replot();
+    static size_t x = 0;
+    line->start->setCoords(x, -160);
+    line->end->setCoords(x, 160);
+    x++;
 }
 
 void MainWindow::receiveVector(const QVector<double>& data, size_t channel)
 {
     static size_t x = 0;
+    const int offset = 105;
     for(size_t i=0; i < data.size(); ++i) {
-        channels_plot->graph(channel)->addData(x, data[i]);
+        channels_plot->graph(channel)->addData(x, data[i]-channel*30+offset);
         x++;
     }
+    x = 0;
     channels_plot->replot();
+}
+
+void MainWindow::receiveEstimateTrend(bool trend)
+{
+    if(trend) ui->trend->setStyleSheet("QLabel { background-color : red; color : black; }");
+    else ui->trend->setStyleSheet("QLabel { background-color : green; color : black; }");
 }
 
 void MainWindow::initPlot(QCustomPlot* plot) {
@@ -100,7 +121,7 @@ void MainWindow::initPlot(QCustomPlot* plot) {
     plot->yAxis->grid()->setZeroLinePen(Qt::NoPen);
     plot->xAxis->setUpperEnding(QCPLineEnding::esSpikeArrow);
     plot->yAxis->setUpperEnding(QCPLineEnding::esSpikeArrow);
-    plot->yAxis->setRange(-5,5);
+    plot->yAxis->setRange(-150,150);
     plot->xAxis->setRange(0,BUFFER_SIZE);
     QLinearGradient plotGradient;
     plotGradient.setStart(0, 0);
@@ -114,6 +135,11 @@ void MainWindow::initPlot(QCustomPlot* plot) {
     axisRectGradient.setColorAt(0, QColor(80, 80, 80));
     axisRectGradient.setColorAt(1, QColor(30, 30, 30));
     plot->axisRect()->setBackground(axisRectGradient);
+
+    plot->legend->setVisible(true);
+    QFont legendFont = font();
+    legendFont.setPointSize(10);
+    plot->legend->setFont(legendFont);
 }
 
 

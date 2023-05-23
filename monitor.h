@@ -9,6 +9,9 @@
 
 constexpr size_t BUFFER_SIZE = 1000;
 constexpr size_t CHANNELS = 8;
+constexpr double EXPECTED_SPEED = 500; // м/с
+constexpr double WARNING_THRESHOLD = 5; // м/с
+constexpr double DANGER_THRESHOLD = 10; // м/с
 
 enum channels {
     ch1,
@@ -37,23 +40,30 @@ private:
     QVector<double> buffer;
     QVector<double> average_y_fit_buffer;
     QVector<double> y_fit_test;
+    QVector<double> expectedSpeedData;
+    QVector<QVector<double>> channels_buffer;
     double avg_fit{0};
-    const double trend_treshold{0.001};
-    void generateData(QVector<double>&, double, double);
+    const double trend_treshold{0.002};
+    double average_channels{0};
+    void generateTrend(QVector<double>&, double, size_t, size_t end);
+    void generateData(QVector<double>&, double);
     bool estimateDataTrend(double);
     double leastSquares(const QVector<double>&,const QVector<double>&,QVector<double>&);
-    void filter(QVector<double>&);
+    void filter(QVector<double>&, size_t);
+    void medianFilter(QVector<double>&);
+    void estimateChannelsSpeed(QVector<double>&);
+    double speedEst(double);
 private slots:
     void update();
 public slots:
     void start() const;
 public:
     Monitor();
-    double channelSpeedAverage(double, double, double, double, double, double, double, double);
 signals:
     emit void sendChannelDataToPlot(double);
     emit void sendAverage(double);
     emit void sendVector(const QVector<double>&, size_t);
+    emit void sendEstimateTrend(bool);
 };
 
 Q_DECLARE_METATYPE(QVector<QVector<double>>)

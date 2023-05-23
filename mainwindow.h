@@ -21,13 +21,15 @@ public slots:
     void receiveDataToPlot(const QVector<double>&);
     void receiveAverageData(double);
     void receiveVector(const QVector<double>&, size_t);
+    void receiveEstimateTrend(bool);
 private:
     Ui::MainWindow *ui;
+    QVector<QLabel*> channels;
     Monitor* monitor;
     QThread* monitor_thread;
     QMutex* mutex;
     QCustomPlot* channels_plot;
-
+    QCPItemLine* line;
     void initPlot(QCustomPlot*);
 };
 #endif // MAINWINDOW_H
