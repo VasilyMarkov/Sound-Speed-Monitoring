@@ -22,6 +22,7 @@ public slots:
     void receiveValue(double);
     void receiveVector(const QVector<double>&, size_t);
     void receiveEstimateTrend(bool);
+    void receiveChannelFlags(const QVector<speedState>&);
 private:
     Ui::MainWindow *ui;
     QVector<QLabel*> channels;
@@ -30,6 +31,10 @@ private:
     QMutex* mutex;
     QCustomPlot* channels_plot;
     QCPItemLine* line;
+    QCPItemLine* line1;
+    QCPItemLine* line2;
+    QCPItemLine* line3;
+    QCPItemLine* line4;
     void initPlot(QCustomPlot*);
 };
 #endif // MAINWINDOW_H

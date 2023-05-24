@@ -7,8 +7,8 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), monitor_thread(new QThread())
 {
     ui->setupUi(this); 
-    setFixedHeight(1000);
-    setFixedWidth(1500);
+    setFixedHeight(700);
+    setFixedWidth(1000);
     channels = {ui->ch1, ui->ch2, ui->ch3, ui->ch4, ui->ch5, ui->ch6, ui->ch7, ui->ch8};
     channels_plot = ui->plot;
     initPlot(channels_plot);
@@ -34,19 +34,39 @@ MainWindow::MainWindow(QWidget *parent)
     channels_plot->graph(ch8)->setPen(QPen(QColor(156, 250, 62), 2));
     channels_plot->graph(ch8)->setName("Channel 8");
 
-    channels_plot->graph(expected)->setPen(QPen(QColor(Qt::gray), 1.5));
+    channels_plot->graph(expected)->setPen(QPen(QColor(210, 195, 224), 2));
     channels_plot->graph(expected)->setName("Exp");
 
     line = new QCPItemLine(channels_plot);
     line->setPen(QPen(QColor(250, 250, 62), 1));
 
+    line1 = new QCPItemLine(channels_plot);
+    line1->setPen(QPen(QColor(240, 199, 50), 2, Qt::DotLine));
+    line2 = new QCPItemLine(channels_plot);
+    line2->setPen(QPen(QColor(240, 199, 50), 2, Qt::DotLine));
+    line3 = new QCPItemLine(channels_plot);
+    line3->setPen(QPen(QColor(219, 57, 57), 2, Qt::DotLine));
+    line4 = new QCPItemLine(channels_plot);
+    line4->setPen(QPen(QColor(219, 57, 57), 2, Qt::DotLine));
+
+    line1->start->setCoords(0, -125);
+    line1->end->setCoords(1000, -125);
+    line2->start->setCoords(0, -135);
+    line2->end->setCoords(1000, -135);
+
+    line3->start->setCoords(0, -120);
+    line3->end->setCoords(1000, -120);
+    line4->start->setCoords(0, -140);
+    line4->end->setCoords(1000, -140);
+
+
     monitor = new Monitor();
     monitor->moveToThread(monitor_thread);
     connect(monitor_thread, &QThread::started, monitor, &Monitor::start);
-    //connect(monitor, &Monitor::sendChannelDataToPlot, this, &MainWindow::receiveDataToPlot, Qt::QueuedConnection);
     connect(monitor, &Monitor::sendValue, this, &MainWindow::receiveValue, Qt::QueuedConnection);
     connect(monitor, &Monitor::sendVector, this, &MainWindow::receiveVector, Qt::QueuedConnection);
     connect(monitor, &Monitor::sendEstimateTrend, this, &MainWindow::receiveEstimateTrend, Qt::QueuedConnection);
+    connect(monitor, &Monitor::sendChannelFlags, this, &MainWindow::receiveChannelFlags, Qt::QueuedConnection);
     monitor_thread->start();
 }
 
@@ -78,9 +98,7 @@ void MainWindow::receiveDataToPlot(const QVector<double>& data)
 
 void MainWindow::receiveValue(double value)
 {
-
     static size_t x = 0;
-    qDebug() << value;
     channels_plot->graph(expected)->addData(x, value - 130);
     line->start->setCoords(x, -160);
     line->end->setCoords(x, 160);
@@ -104,6 +122,24 @@ void MainWindow::receiveEstimateTrend(bool trend)
 {
     if(trend) ui->trend->setStyleSheet("QLabel { background-color : red; color : black; }");
     else ui->trend->setStyleSheet("QLabel { background-color : green; color : black; }");
+}
+
+void MainWindow::receiveChannelFlags(const QVector<speedState>& channels_speed_state)
+{
+    assert(channels_speed_state.size() == channels.size());
+    for(auto i=0; i < channels.size(); ++i) {
+        switch (channels_speed_state[i]) {
+            case speedState::normal:
+                channels[i]->setStyleSheet("QLabel { background-color : green; color : black; }");
+            break;
+            case speedState::warning:
+                channels[i]->setStyleSheet("QLabel { background-color : yellow; color : black; }");
+            break;
+            case speedState::critical:
+                channels[i]->setStyleSheet("QLabel { background-color : red; color : black; }");
+            break;
+        }
+    }
 }
 
 void MainWindow::initPlot(QCustomPlot* plot) {
