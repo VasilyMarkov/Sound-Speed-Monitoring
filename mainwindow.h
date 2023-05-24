@@ -19,7 +19,7 @@ public:
     ~MainWindow();
 public slots:
     void receiveDataToPlot(const QVector<double>&);
-    void receiveAverageData(double);
+    void receiveValue(double);
     void receiveVector(const QVector<double>&, size_t);
     void receiveEstimateTrend(bool);
 private:

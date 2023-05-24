@@ -7,16 +7,16 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), monitor_thread(new QThread())
 {
     ui->setupUi(this); 
-    setFixedHeight(1350);
-    setFixedWidth(2100);
+    setFixedHeight(1000);
+    setFixedWidth(1500);
     channels = {ui->ch1, ui->ch2, ui->ch3, ui->ch4, ui->ch5, ui->ch6, ui->ch7, ui->ch8};
     channels_plot = ui->plot;
     initPlot(channels_plot);
-    for(size_t i = 0; i < CHANNELS; ++i) {
+    for(size_t i = 0; i < CHANNELS+1; ++i) {
         channels_plot->addGraph();
     }
     channels_plot->yAxis->setTickLabels(true);
-    //channels_plot->graph(ch1)->setPen(QPen(QColor(Qt::gray), 1.5));
+
     channels_plot->graph(ch1)->setPen(QPen(QColor(212, 62, 250), 2));
     channels_plot->graph(ch1)->setName("Channel 1");
     channels_plot->graph(ch2)->setPen(QPen(QColor(106, 62, 250), 2));
@@ -34,6 +34,9 @@ MainWindow::MainWindow(QWidget *parent)
     channels_plot->graph(ch8)->setPen(QPen(QColor(156, 250, 62), 2));
     channels_plot->graph(ch8)->setName("Channel 8");
 
+    channels_plot->graph(expected)->setPen(QPen(QColor(Qt::gray), 1.5));
+    channels_plot->graph(expected)->setName("Exp");
+
     line = new QCPItemLine(channels_plot);
     line->setPen(QPen(QColor(250, 250, 62), 1));
 
@@ -41,7 +44,7 @@ MainWindow::MainWindow(QWidget *parent)
     monitor->moveToThread(monitor_thread);
     connect(monitor_thread, &QThread::started, monitor, &Monitor::start);
     //connect(monitor, &Monitor::sendChannelDataToPlot, this, &MainWindow::receiveDataToPlot, Qt::QueuedConnection);
-    connect(monitor, &Monitor::sendAverage, this, &MainWindow::receiveAverageData, Qt::QueuedConnection);
+    connect(monitor, &Monitor::sendValue, this, &MainWindow::receiveValue, Qt::QueuedConnection);
     connect(monitor, &Monitor::sendVector, this, &MainWindow::receiveVector, Qt::QueuedConnection);
     connect(monitor, &Monitor::sendEstimateTrend, this, &MainWindow::receiveEstimateTrend, Qt::QueuedConnection);
     monitor_thread->start();
@@ -73,22 +76,23 @@ void MainWindow::receiveDataToPlot(const QVector<double>& data)
 //    qDebug() << channels_plot->replotTime(true);
 }
 
-void MainWindow::receiveAverageData(double value)
+void MainWindow::receiveValue(double value)
 {
-//    static size_t x = 0;
-//    channels_plot->graph(ch1)->addData(x++, value);
-//    channels_plot->replot();
+
     static size_t x = 0;
+    qDebug() << value;
+    channels_plot->graph(expected)->addData(x, value - 130);
     line->start->setCoords(x, -160);
     line->end->setCoords(x, 160);
     x++;
+    channels_plot->replot();
 }
 
 void MainWindow::receiveVector(const QVector<double>& data, size_t channel)
 {
     static size_t x = 0;
     const int offset = 105;
-    for(size_t i=0; i < data.size(); ++i) {
+    for(auto i=0; i < data.size(); ++i) {
         channels_plot->graph(channel)->addData(x, data[i]-channel*30+offset);
         x++;
     }

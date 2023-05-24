@@ -6,6 +6,7 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QDebug>
+#include <queue>
 
 constexpr size_t BUFFER_SIZE = 1000;
 constexpr size_t CHANNELS = 8;
@@ -21,7 +22,8 @@ enum channels {
     ch5,
     ch6,
     ch7,
-    ch8
+    ch8,
+    expected
 };
 
 class Monitor: public QObject
@@ -30,18 +32,16 @@ class Monitor: public QObject
 private:
     QTimer* timer;
     QMutex mutex;
-    QVector<QVector<double>> sensors;
+    QVector<QVector<double>> sensorChannelsInput; //Канальные скорости от датчиков
+    QVector<double> expectedSpeedData; // Ожидаемая скорость
+    double expectedSpeedInput;
     std::array<double, BUFFER_SIZE> average_speed_of_sound_;
     size_t index{0};
-    QVector<double> test_vector;
     QVector<double> x_buffer;
-    QVector<double> t_buffer;
-    QVector<double> y_fit_t;
     QVector<double> buffer;
-    QVector<double> average_y_fit_buffer;
     QVector<double> y_fit_test;
-    QVector<double> expectedSpeedData;
     QVector<QVector<double>> channels_buffer;
+    QVector<double> median_filter;
     double avg_fit{0};
     const double trend_treshold{0.002};
     double average_channels{0};
@@ -61,7 +61,7 @@ public:
     Monitor();
 signals:
     emit void sendChannelDataToPlot(double);
-    emit void sendAverage(double);
+    emit void sendValue(double);
     emit void sendVector(const QVector<double>&, size_t);
     emit void sendEstimateTrend(bool);
 };
