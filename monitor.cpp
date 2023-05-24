@@ -22,6 +22,10 @@ Monitor::Monitor():timer(new QTimer(this))
     sensorChannelsInput[ch2][50] = 7;
     sensorChannelsInput[ch2][100] = -7;
 
+    generateTrend(sensorChannelsInput[ch5], 10, 200, 400);
+    generateTrend(sensorChannelsInput[ch5], -10, 401, 600);
+    sensorChannelsInput[ch5][200] = 10;
+
     x_buffer.resize(50);
     buffer.resize(50);
     std::iota(std::begin(x_buffer), std::end(x_buffer), 0);
@@ -52,7 +56,7 @@ void Monitor::update()
     estimateChannelsSpeed(filtered_data, average_channels);
     emit sendChannelFlags(channels_flags);
 
-    //estimateDataTrend(average_channels);
+    estimateDataTrend(filtered_data[ch2]);
     //emit sendValue(average_channels);
     if(index == 1) {
         for(auto i = 0; i < sensorChannelsInput.size(); ++i) {
@@ -91,13 +95,13 @@ bool Monitor::estimateDataTrend(double value) {
         filter(buffer, 9);
         QVector<double> y_fit(50);
         avg_fit = leastSquares(buffer, x_buffer, y_fit);
-        y_fit_test.push_back(leastSquares(buffer, x_buffer, y_fit));
+        //y_fit_test.push_back(leastSquares(buffer, x_buffer, y_fit));
         qDebug() << avg_fit << "avg";
         bool trend_detection;
         if(std::abs(avg_fit) > trend_treshold) trend_detection = true;
         else trend_detection = false;
-        emit sendEstimateTrend(trend_detection);
-        emit sendVector(buffer, ch1);
+//        emit sendEstimateTrend(trend_detection);
+//        emit sendVector(buffer, ch1);
         cnt = 0;
     }
     else cnt++;
