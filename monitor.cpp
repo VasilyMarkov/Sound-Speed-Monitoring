@@ -19,6 +19,7 @@ Monitor::Monitor():timer(new QTimer(this))
     generateData(expectedSpeedData, 0.5);
     generateTrend(sensorChannelsInput[ch2], 15, 0, 300);
     generateTrend(sensorChannelsInput[ch2], -15, 301, 600);
+    generateTrend(sensorChannelsInput[ch4], 5, 0, BUFFER_SIZE-1);
     sensorChannelsInput[ch2][50] = 7;
     sensorChannelsInput[ch2][100] = -7;
 
@@ -56,7 +57,7 @@ void Monitor::update()
     estimateChannelsSpeed(filtered_data, average_channels);
     emit sendChannelFlags(channels_flags);
 
-    estimateDataTrend(filtered_data[ch2]);
+    estimateDataTrend(filtered_data[ch4]);
     //emit sendValue(average_channels);
     if(index == 1) {
         for(auto i = 0; i < sensorChannelsInput.size(); ++i) {
@@ -90,17 +91,20 @@ double Monitor::leastSquares(const QVector<double>& y, const QVector<double>& x,
 
 bool Monitor::estimateDataTrend(double value) {
     static size_t cnt{0};
+    static double test{0};
     buffer[cnt] = value;
     if(cnt == 49) {
         filter(buffer, 9);
         QVector<double> y_fit(50);
         avg_fit = leastSquares(buffer, x_buffer, y_fit);
         //y_fit_test.push_back(leastSquares(buffer, x_buffer, y_fit));
-        qDebug() << avg_fit << "avg";
+        test += avg_fit;
+        test /=2;
+        qDebug() << avg_fit << test;
         bool trend_detection;
         if(std::abs(avg_fit) > trend_treshold) trend_detection = true;
         else trend_detection = false;
-//        emit sendEstimateTrend(trend_detection);
+        emit sendEstimateTrend(trend_detection);
 //        emit sendVector(buffer, ch1);
         cnt = 0;
     }

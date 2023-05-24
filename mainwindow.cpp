@@ -7,8 +7,8 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), monitor_thread(new QThread())
 {
     ui->setupUi(this); 
-    setFixedHeight(700);
-    setFixedWidth(1000);
+    setFixedHeight(1400);
+    setFixedWidth(2000);
     channels = {ui->ch1, ui->ch2, ui->ch3, ui->ch4, ui->ch5, ui->ch6, ui->ch7, ui->ch8};
     channels_plot = ui->plot;
     initPlot(channels_plot);
@@ -35,7 +35,7 @@ MainWindow::MainWindow(QWidget *parent)
     channels_plot->graph(ch8)->setName("Channel 8");
 
     channels_plot->graph(expected)->setPen(QPen(QColor(210, 195, 224), 2));
-    channels_plot->graph(expected)->setName("Exp");
+    channels_plot->graph(expected)->setName("Real Time");
 
     line = new QCPItemLine(channels_plot);
     line->setPen(QPen(QColor(250, 250, 62), 1));
