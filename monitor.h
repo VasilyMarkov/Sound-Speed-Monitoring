@@ -32,6 +32,12 @@ enum class speedState {
     critical
 };
 
+enum class typeSimulation {
+    channelsSpeed,
+    trend,
+    expectedSpeed
+};
+
 class Monitor: public QObject
 {
     Q_OBJECT
@@ -52,11 +58,13 @@ private:
     double avg_fit{0};
     const double trend_treshold{0.002};
     double average_channels{0};
+    void generateSim1Data();
+    void generateSim2Data();
+    void generateSim3Data();
     void generateTrend(QVector<double>&, double, size_t, size_t end);
     void generateData(QVector<double>&, double);
     bool estimateDataTrend(double);
     double leastSquares(const QVector<double>&,const QVector<double>&,QVector<double>&);
-    void filter(QVector<double>&, size_t);
     void estimateChannelsSpeed(QVector<double>&, double);
     double medianFilter(double, size_t);
 
@@ -65,7 +73,7 @@ private slots:
 public slots:
     void start() const;
 public:
-    Monitor();
+    Monitor(typeSimulation);
 signals:
     emit void sendChannelDataToPlot(double);
     emit void sendValue(double);

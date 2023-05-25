@@ -23,6 +23,9 @@ public slots:
     void receiveVector(const QVector<double>&, size_t);
     void receiveEstimateTrend(bool);
     void receiveChannelFlags(const QVector<speedState>&);
+private slots:
+    void on_sim_clicked(bool checked);
+
 private:
     Ui::MainWindow *ui;
     QVector<QLabel*> channels;
@@ -36,5 +39,7 @@ private:
     QCPItemLine* line3;
     QCPItemLine* line4;
     void initPlot(QCustomPlot*);
+signals:
+    emit threadTimerStop();
 };
 #endif // MAINWINDOW_H

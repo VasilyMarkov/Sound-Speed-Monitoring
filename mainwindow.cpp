@@ -10,6 +10,8 @@ MainWindow::MainWindow(QWidget *parent)
     setFixedHeight(1400);
     setFixedWidth(2000);
     channels = {ui->ch1, ui->ch2, ui->ch3, ui->ch4, ui->ch5, ui->ch6, ui->ch7, ui->ch8};
+    ui->sim->setCheckable(true);
+    ui->tests->addItems({"Проверка каналов", "Проверка ожидаемой скорости", "Проверка тренда"});
     channels_plot = ui->plot;
     initPlot(channels_plot);
     for(size_t i = 0; i < CHANNELS+1; ++i) {
@@ -60,14 +62,7 @@ MainWindow::MainWindow(QWidget *parent)
     line4->end->setCoords(1000, -140);
 
 
-    monitor = new Monitor();
-    monitor->moveToThread(monitor_thread);
-    connect(monitor_thread, &QThread::started, monitor, &Monitor::start);
-    connect(monitor, &Monitor::sendValue, this, &MainWindow::receiveValue, Qt::QueuedConnection);
-    connect(monitor, &Monitor::sendVector, this, &MainWindow::receiveVector, Qt::QueuedConnection);
-    connect(monitor, &Monitor::sendEstimateTrend, this, &MainWindow::receiveEstimateTrend, Qt::QueuedConnection);
-    connect(monitor, &Monitor::sendChannelFlags, this, &MainWindow::receiveChannelFlags, Qt::QueuedConnection);
-    monitor_thread->start();
+
 }
 
 MainWindow::~MainWindow()
@@ -120,8 +115,14 @@ void MainWindow::receiveVector(const QVector<double>& data, size_t channel)
 
 void MainWindow::receiveEstimateTrend(bool trend)
 {
-    if(trend) ui->trend->setStyleSheet("QLabel { background-color : red; color : black; }");
-    else ui->trend->setStyleSheet("QLabel { background-color : green; color : black; }");
+    if(trend) ui->trend->setStyleSheet("QLabel { \
+                                       border: 1px solid #8f8f8f; \
+                                       border-radius: 2px; \
+                                       background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #F92424, stop: 1 #FA7878) }");
+    else ui->trend->setStyleSheet("QLabel { \
+                                  border: 1px solid #8f8f8f; \
+                                  border-radius: 2px; \
+                                  background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #77FF77, stop: 1 #00DD00) }");
 }
 
 void MainWindow::receiveChannelFlags(const QVector<speedState>& channels_speed_state)
@@ -130,13 +131,22 @@ void MainWindow::receiveChannelFlags(const QVector<speedState>& channels_speed_s
     for(auto i=0; i < channels.size(); ++i) {
         switch (channels_speed_state[i]) {
             case speedState::normal:
-                channels[i]->setStyleSheet("QLabel { background-color : green; color : black; }");
+                channels[i]->setStyleSheet("QLabel { \
+                                           border: 1px solid #8f8f8f; \
+                                           border-radius: 2px; \
+                                           background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #00DD00, stop: 1 #77FF77) }");
             break;
             case speedState::warning:
-                channels[i]->setStyleSheet("QLabel { background-color : yellow; color : black; }");
+                channels[i]->setStyleSheet("QLabel { \
+                                           border: 1px solid #8f8f8f; \
+                                           border-radius: 2px; \
+                                           background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #F8D514, stop: 1 #FAE365) }");
             break;
             case speedState::critical:
-                channels[i]->setStyleSheet("QLabel { background-color : red; color : black; }");
+                channels[i]->setStyleSheet("QLabel { \
+                                           border: 1px solid #8f8f8f; \
+                                           border-radius: 2px; \
+                                           background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #F92424, stop: 1 #FA7878) }");
             break;
         }
     }
@@ -182,4 +192,29 @@ void MainWindow::initPlot(QCustomPlot* plot) {
     plot->legend->setFont(legendFont);
 }
 
+
+
+void MainWindow::on_sim_clicked(bool checked)
+{
+    if(checked) {
+        if(!monitor) {
+            monitor = new Monitor();
+            monitor->moveToThread(monitor_thread);
+            connect(monitor_thread, &QThread::started, monitor, &Monitor::start);
+            connect(monitor, &Monitor::sendValue, this, &MainWindow::receiveValue, Qt::QueuedConnection);
+            connect(monitor, &Monitor::sendVector, this, &MainWindow::receiveVector, Qt::QueuedConnection);
+            connect(monitor, &Monitor::sendEstimateTrend, this, &MainWindow::receiveEstimateTrend, Qt::QueuedConnection);
+            connect(monitor, &Monitor::sendChannelFlags, this, &MainWindow::receiveChannelFlags, Qt::QueuedConnection);
+            monitor_thread->start();
+        }
+
+        ui->sim->setStyleSheet("QPushButton { \
+                               border: 1px solid #8f8f8f; \
+                               border-radius: 2px; \
+                               background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #77FF77, stop: 1 #00DD00) }");
+    }
+    else{
+        ui->sim->setStyleSheet("");
+    }
+}
 

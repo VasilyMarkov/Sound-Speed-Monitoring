@@ -2,30 +2,25 @@
 #include "algorithm"
 #include "math.h"
 #include <QRandomGenerator>
-Monitor::Monitor():timer(new QTimer(this))
+Monitor::Monitor(typeSimulation typeSimulation_):timer(new QTimer(this))
 {
     connect(timer, &QTimer::timeout, this, &Monitor::update);
     qRegisterMetaType<QVector<double>>();
     qRegisterMetaType<QVector<speedState>>();
-    sensorChannelsInput.resize(8);
-    for(auto& sensor:sensorChannelsInput) { //Заполняем данными все каналы сенсоров
-        sensor.resize(BUFFER_SIZE);
-        //sensor.fill(600);
-        generateData(sensor, 0.5);
+
+    switch (typeSimulation_) {
+        case typeSimulation::channelsSpeed:
+            generateSim1Data();
+        break;
+        case typeSimulation::expectedSpeed:
+            generateSim2Data();
+        break;
+        case typeSimulation::trend:
+            generateSim3Data();
+        break;
+        default:
+        break;
     }
-
-    expectedSpeedData.resize(BUFFER_SIZE);
-    expectedSpeedData.fill(EXPECTED_SPEED);
-    generateData(expectedSpeedData, 0.5);
-    generateTrend(sensorChannelsInput[ch2], 15, 0, 300);
-    generateTrend(sensorChannelsInput[ch2], -15, 301, 600);
-    generateTrend(sensorChannelsInput[ch4], 5, 0, BUFFER_SIZE-1);
-    sensorChannelsInput[ch2][50] = 7;
-    sensorChannelsInput[ch2][100] = -7;
-
-    generateTrend(sensorChannelsInput[ch5], 10, 200, 400);
-    generateTrend(sensorChannelsInput[ch5], -10, 401, 600);
-    sensorChannelsInput[ch5][200] = 10;
 
     x_buffer.resize(50);
     buffer.resize(50);
@@ -39,8 +34,49 @@ Monitor::Monitor():timer(new QTimer(this))
     channels_flags.resize(CHANNELS);
 }
 
+void Monitor::generateSim1Data()
+{
+    sensorChannelsInput.resize(8);
+    for(auto& sensor:sensorChannelsInput) {
+        sensor.resize(BUFFER_SIZE);
+        generateData(sensor, 0.5);
+    }
+    generateTrend(sensorChannelsInput[ch2], 15, 0, 300);
+    generateTrend(sensorChannelsInput[ch2], -15, 301, 600);
+    generateTrend(sensorChannelsInput[ch4], 10, 0, BUFFER_SIZE);
+    sensorChannelsInput[ch2][50] = 7;
+    sensorChannelsInput[ch2][100] = -7;
+    generateTrend(sensorChannelsInput[ch5], 10, 200, 400);
+    generateTrend(sensorChannelsInput[ch5], -10, 401, 600);
+    sensorChannelsInput[ch5][200] = 10;
+}
+
+void Monitor::generateSim2Data()
+{
+    sensorChannelsInput.resize(8);
+    for(auto& sensor:sensorChannelsInput) {
+        sensor.resize(BUFFER_SIZE);
+        generateData(sensor, 0.5);
+        generateTrend(sensor[ch4], 10, 0, BUFFER_SIZE);
+    }
+}
+
+void Monitor::generateSim3Data()
+{
+    sensorChannelsInput.resize(8);
+    for(auto& sensor:sensorChannelsInput) {
+        sensor.resize(BUFFER_SIZE);
+        generateData(sensor, 0.5);
+    }
+    expectedSpeedData.resize(BUFFER_SIZE);
+    expectedSpeedData.fill(EXPECTED_SPEED);
+    generateData(expectedSpeedData, 0.5);
+}
+
 void Monitor::update()
 {
+    if(index == 1000) timer->stop();
+
     QMutexLocker locker(&mutex);
     expectedSpeedInput = expectedSpeedData[index];
     QVector<double> filtered_data = {medianFilter(sensorChannelsInput[ch1][index], ch1),
@@ -53,23 +89,35 @@ void Monitor::update()
                                      medianFilter(sensorChannelsInput[ch8][index], ch8)};
 
     average_channels = std::accumulate(std::begin(filtered_data), std::end(filtered_data), 0.0)/CHANNELS;
-    emit sendValue(filtered_data[ch2]);
-    estimateChannelsSpeed(filtered_data, average_channels);
-    emit sendChannelFlags(channels_flags);
-
-    estimateDataTrend(filtered_data[ch4]);
-    //emit sendValue(average_channels);
     if(index == 1) {
         for(auto i = 0; i < sensorChannelsInput.size(); ++i) {
             emit sendVector(sensorChannelsInput[i], i);
         }
     }
-    if(index == 999) {
-        qDebug() << std::accumulate(std::begin(y_fit_test), std::end(y_fit_test), 0.0)/y_fit_test.size();
-        timer->stop();
+
+    switch (typeSimulation_) {
+        case typeSimulation::channelsSpeed:
+            emit sendValue(filtered_data[ch2]);
+        break;
+        case typeSimulation::expectedSpeed:
+
+        break;
+        case typeSimulation::trend:
+            estimateDataTrend(average_channels);
+        break;
+        default:
+        break;
     }
 
+    estimateChannelsSpeed(filtered_data, average_channels);
+    emit sendChannelFlags(channels_flags);
+
     ++index;
+}
+
+void Monitor::stop()
+{
+    timer->stop();
 }
 
 double Monitor::leastSquares(const QVector<double>& y, const QVector<double>& x, QVector<double>& y_fit_o) {
@@ -94,18 +142,13 @@ bool Monitor::estimateDataTrend(double value) {
     static double test{0};
     buffer[cnt] = value;
     if(cnt == 49) {
-        filter(buffer, 9);
         QVector<double> y_fit(50);
         avg_fit = leastSquares(buffer, x_buffer, y_fit);
-        //y_fit_test.push_back(leastSquares(buffer, x_buffer, y_fit));
-        test += avg_fit;
-        test /=2;
-        qDebug() << avg_fit << test;
+        qDebug() << avg_fit;
         bool trend_detection;
         if(std::abs(avg_fit) > trend_treshold) trend_detection = true;
         else trend_detection = false;
         emit sendEstimateTrend(trend_detection);
-//        emit sendVector(buffer, ch1);
         cnt = 0;
     }
     else cnt++;
@@ -130,18 +173,6 @@ void Monitor::generateData(QVector<double>& data, double variance)
     for(auto& i:data) {
          i += QRandomGenerator::global()->generateDouble();
          i -= 0.5;
-    }
-}
-
-void Monitor::filter(QVector<double>& data, size_t window)
-{
-    assert(window > 0 && !data.empty());
-
-    for(size_t i = 0; i < data.size()-window; ++i) {
-        data[i] = std::accumulate(std::begin(data)+i, std::begin(data)+i+window, 0.0)/window;
-    }
-    for(size_t i = data.size()-1; i > data.size()-window; --i) {
-        data[i] = std::accumulate(std::begin(data)+i-window, std::begin(data)+i, 0.0)/window;
     }
 }
 
