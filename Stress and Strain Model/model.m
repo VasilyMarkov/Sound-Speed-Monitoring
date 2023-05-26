@@ -21,7 +21,7 @@ x_ratio1 = zeros(1, ch); x_ratio2 = zeros(1, ch);
 raduis_1 = zeros(1, ch); raduis_2 = zeros(1, ch);
 x_out1 = zeros(1, ch); x_out2 = zeros(1, ch);
 diameter = zeros(1, ch);
-angle = zeros(1, ch);
+angle_out = zeros(1, ch);
 x_out = zeros(1, ch);
 for i = 1:ch
     d1(i) = 1+Ks*((dP*r1(i))/(E*delta)); % (E.16), (E.22)
@@ -45,7 +45,7 @@ l_out = l1+l2; %Длина акустического пути для каждого канала
 x_out = x_out1+x_out2;
 
 for i = 1:ch
-   angle(i) = rad2deg(acos(x_out(i)/l_out(i)));  %Углы между осями акустического канала и трубопровода
+   angle_out(i) = rad2deg(acos(x_out(i)/l_out(i)));  %Углы между осями акустического канала и трубопровода
 end
 
 %Входные данные датчиков 
@@ -54,8 +54,8 @@ D = [50.25 50.5 50 49 49.5 50 49.75 51]; %Внешние радиусы посадочных мест
 d = [31 32.5 32.25 32.75 32.5 32.25 32 31]; %Внутренние радиусы посадочных мест 
 lt = [230 229 230 230.25 231 230.75 229.5 230];
 lp = [220 221 220.5 220.25 221 220.75 219.5 220];
-deltaLp = zeros(1, N);
-deltaLt = zeros(1, N);
+deltaLp_out = zeros(1, N);
+deltaLt_out = zeros(1, N);
 Et = 1.9*10^11;
 Ep = 2*10^11;
 alpha = 1.25*10^-5;
@@ -63,8 +63,8 @@ alpha_t = 1.5*10^-5;
 for i = 1:N
     %Линейное изменеие размера посадочного места вдоль акустического пути
     %(Изменение давления)
-   deltaLp(i) = dP*((lt(i)/Et)+(lp(i)/Ep)*((d(i)^2)/((D(i)^2)-(d(i)^2))));
+   deltaLp_out(i) = dP*((lt(i)/Et)+(lp(i)/Ep)*((d(i)^2)/((D(i)^2)-(d(i)^2))));
    %(Изменение температуры)
-   deltaLt(i) = lt(i)*dT*(alpha-alpha_t);
+   deltaLt_out(i) = lt(i)*dT*(alpha-alpha_t);
 end
 
