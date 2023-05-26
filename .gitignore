@@ -1,0 +1,10 @@
+debug
+*pro.user
+*.qmake.stash
+*.o
+Estimate Speeds Soft/build/release/*.cpp
+Estimate Speeds Soft/build/release/*.h
+Estimate Speeds Soft/build/*.h
+Estimate Speeds Soft/build/MakeFile
+Estimate Speeds Soft/build/MakeFile.Debug
+Estimate Speeds Soft/build/MakeFile.Release
