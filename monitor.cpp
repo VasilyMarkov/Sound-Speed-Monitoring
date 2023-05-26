@@ -2,26 +2,13 @@
 #include "algorithm"
 #include "math.h"
 #include <QRandomGenerator>
-Monitor::Monitor(typeSimulation typeSimulation_):timer(new QTimer(this))
+Monitor::Monitor():timer(new QTimer(this))
 {
     connect(timer, &QTimer::timeout, this, &Monitor::update);
     qRegisterMetaType<QVector<double>>();
-    qRegisterMetaType<QVector<speedState>>();
-
-    switch (typeSimulation_) {
-        case typeSimulation::channelsSpeed:
-            generateSim1Data();
-        break;
-        case typeSimulation::expectedSpeed:
-            generateSim2Data();
-        break;
-        case typeSimulation::trend:
-            generateSim3Data();
-        break;
-        default:
-        break;
-    }
-
+    qRegisterMetaType<QVector<my::speedState>>();
+    qRegisterMetaType<my::typeSimulation>();
+    qRegisterMetaType<my::speedState>();
     x_buffer.resize(50);
     buffer.resize(50);
     std::iota(std::begin(x_buffer), std::end(x_buffer), 0);
@@ -36,6 +23,7 @@ Monitor::Monitor(typeSimulation typeSimulation_):timer(new QTimer(this))
 
 void Monitor::generateSim1Data()
 {
+    using namespace my;
     sensorChannelsInput.resize(8);
     for(auto& sensor:sensorChannelsInput) {
         sensor.resize(BUFFER_SIZE);
@@ -52,13 +40,15 @@ void Monitor::generateSim1Data()
 }
 
 void Monitor::generateSim2Data()
-{
+{     
     sensorChannelsInput.resize(8);
     for(auto& sensor:sensorChannelsInput) {
         sensor.resize(BUFFER_SIZE);
         generateData(sensor, 0.5);
-        generateTrend(sensor[ch4], 10, 0, BUFFER_SIZE);
     }
+    expectedSpeedData.resize(BUFFER_SIZE);
+    expectedSpeedData.fill(0);
+    generateData(expectedSpeedData, 0.5);
 }
 
 void Monitor::generateSim3Data()
@@ -67,57 +57,55 @@ void Monitor::generateSim3Data()
     for(auto& sensor:sensorChannelsInput) {
         sensor.resize(BUFFER_SIZE);
         generateData(sensor, 0.5);
+        generateTrend(sensor, 10, 0, BUFFER_SIZE);
     }
-    expectedSpeedData.resize(BUFFER_SIZE);
-    expectedSpeedData.fill(EXPECTED_SPEED);
-    generateData(expectedSpeedData, 0.5);
 }
 
 void Monitor::update()
 {
-    if(index == 1000) timer->stop();
+    using namespace my;
+    try {
+        if(index == BUFFER_SIZE-1) timer->stop();
 
-    QMutexLocker locker(&mutex);
-    expectedSpeedInput = expectedSpeedData[index];
-    QVector<double> filtered_data = {medianFilter(sensorChannelsInput[ch1][index], ch1),
-                                     medianFilter(sensorChannelsInput[ch2][index], ch2),
-                                     medianFilter(sensorChannelsInput[ch3][index], ch3),
-                                     medianFilter(sensorChannelsInput[ch4][index], ch4),
-                                     medianFilter(sensorChannelsInput[ch5][index], ch5),
-                                     medianFilter(sensorChannelsInput[ch6][index], ch6),
-                                     medianFilter(sensorChannelsInput[ch7][index], ch7),
-                                     medianFilter(sensorChannelsInput[ch8][index], ch8)};
+        QMutexLocker locker(&mutex);
 
-    average_channels = std::accumulate(std::begin(filtered_data), std::end(filtered_data), 0.0)/CHANNELS;
-    if(index == 1) {
-        for(auto i = 0; i < sensorChannelsInput.size(); ++i) {
-            emit sendVector(sensorChannelsInput[i], i);
+        QVector<double> filtered_data = {medianFilter(sensorChannelsInput[ch1][index], ch1),
+                                         medianFilter(sensorChannelsInput[ch2][index], ch2),
+                                         medianFilter(sensorChannelsInput[ch3][index], ch3),
+                                         medianFilter(sensorChannelsInput[ch4][index], ch4),
+                                         medianFilter(sensorChannelsInput[ch5][index], ch5),
+                                         medianFilter(sensorChannelsInput[ch6][index], ch6),
+                                         medianFilter(sensorChannelsInput[ch7][index], ch7),
+                                         medianFilter(sensorChannelsInput[ch8][index], ch8)};
+
+        average_channels = std::accumulate(std::begin(filtered_data), std::end(filtered_data), 0.0)/CHANNELS;
+
+        switch (_typeSimulatiion) {
+            case channelsSpeed:
+                emit sendValue(filtered_data[ch2]);
+            break;
+            case expectedSpeed:
+                estimateExpectedSpeed(expectedSpeedData[index], average_channels);
+                emit sendValue(expectedSpeedData[index]);
+            break;
+            case trend:
+                estimateDataTrend(average_channels);
+                emit sendValue(average_channels);
+            break;
+            default:
+            break;
         }
+
+        estimateChannelsSpeed(filtered_data, average_channels);
+        emit sendChannelFlags(channels_flags);
+
+        ++index;
     }
-
-    switch (typeSimulation_) {
-        case typeSimulation::channelsSpeed:
-            emit sendValue(filtered_data[ch2]);
-        break;
-        case typeSimulation::expectedSpeed:
-
-        break;
-        case typeSimulation::trend:
-            estimateDataTrend(average_channels);
-        break;
-        default:
-        break;
+    catch (my::Exception& excep) {
+        timer->stop();
+        index = 0;
+        qCritical() << excep.what();
     }
-
-    estimateChannelsSpeed(filtered_data, average_channels);
-    emit sendChannelFlags(channels_flags);
-
-    ++index;
-}
-
-void Monitor::stop()
-{
-    timer->stop();
 }
 
 double Monitor::leastSquares(const QVector<double>& y, const QVector<double>& x, QVector<double>& y_fit_o) {
@@ -139,25 +127,25 @@ double Monitor::leastSquares(const QVector<double>& y, const QVector<double>& x,
 
 bool Monitor::estimateDataTrend(double value) {
     static size_t cnt{0};
-    static double test{0};
     buffer[cnt] = value;
+    bool trend_detection = false;
     if(cnt == 49) {
         QVector<double> y_fit(50);
         avg_fit = leastSquares(buffer, x_buffer, y_fit);
         qDebug() << avg_fit;
-        bool trend_detection;
         if(std::abs(avg_fit) > trend_treshold) trend_detection = true;
-        else trend_detection = false;
+        else
+            trend_detection = false;
         emit sendEstimateTrend(trend_detection);
         cnt = 0;
     }
     else cnt++;
+    return trend_detection;
 }
 
 void Monitor::generateTrend(QVector<double>& data, double grow_coefficient, size_t begin, size_t end)
 {
-    assert(begin <= end && end < BUFFER_SIZE);
-
+    if(!(begin <= end && end <= BUFFER_SIZE)) throw my::Exception("generateTrend: Error size buffer");
     QVector<double> trend(end-begin, 0);
     double delta{0};
     for(auto& i:trend) {
@@ -176,18 +164,30 @@ void Monitor::generateData(QVector<double>& data, double variance)
     }
 }
 
-void Monitor::estimateChannelsSpeed(QVector<double>& channelsSpeed, double expectedSpeed)
+void Monitor::estimateChannelsSpeed(QVector<double>& channelsSpeed, double average)
 {
     for(auto i = 0; i < channelsSpeed.size(); ++i) {
-        if(std::abs(channelsSpeed[i]-expectedSpeed) > 10) {
-            channels_flags[i] = speedState::critical;
+        if(std::abs(channelsSpeed[i]-average) > 10) {
+            channels_flags[i] = my::speedState::critical;
         }
-        else if(std::abs(channelsSpeed[i]-expectedSpeed) > 5) {
-            channels_flags[i] = speedState::warning;
+        else if(std::abs(channelsSpeed[i]-average) > 5) {
+            channels_flags[i] = my::speedState::warning;
         }
         else
-            channels_flags[i] = speedState::normal;
+            channels_flags[i] = my::speedState::normal;
     }
+}
+
+void Monitor::estimateExpectedSpeed(double expectedSpeed, double average)
+{
+    if(std::abs(expectedSpeed-average) > 10) {
+        expected_speed_state = my::speedState::critical;
+    }
+    else if(std::abs(expectedSpeed-average) > 5) {
+        expected_speed_state = my::speedState::warning;
+    }
+    else
+        expected_speed_state = my::speedState::normal;
 }
 
 double Monitor::medianFilter(double value, size_t channel)
@@ -204,8 +204,31 @@ double Monitor::medianFilter(double value, size_t channel)
     return out;
 }
 
-void Monitor::start() const
+void Monitor::start(int typeSim)
 {
+    _typeSimulatiion = typeSim;
+    sensorChannelsInput.clear();
+    switch (_typeSimulatiion) {
+        case my::typeSimulation::channelsSpeed:
+            generateSim1Data();
+        break;
+        case my::typeSimulation::expectedSpeed:
+            generateSim2Data();
+        break;
+        case my::typeSimulation::trend:
+            generateSim3Data();
+        break;
+        default:
+        break;
+    }
+    for(auto i = 0; i < sensorChannelsInput.size(); ++i) {
+        emit sendVector(sensorChannelsInput[i], i);
+    }
     timer->start(100);
 }
 
+void Monitor::stop()
+{
+    index = 0;
+    timer->stop();
+}

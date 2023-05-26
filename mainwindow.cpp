@@ -7,8 +7,20 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow), monitor_thread(new QThread())
 {
     ui->setupUi(this); 
-    setFixedHeight(1400);
-    setFixedWidth(2000);
+    setFixedHeight(700);
+    setFixedWidth(1000);
+    using namespace my;
+    monitor = new Monitor();
+    monitor->moveToThread(monitor_thread);
+    connect(this, &MainWindow::monitorStart, monitor, &Monitor::start);
+    connect(this, &MainWindow::monitorStop, monitor, &Monitor::stop);
+    connect(monitor, &Monitor::sendValue, this, &MainWindow::receiveValue, Qt::QueuedConnection);
+    connect(monitor, &Monitor::sendVector, this, &MainWindow::receiveVector, Qt::QueuedConnection);
+    connect(monitor, &Monitor::sendEstimateTrend, this, &MainWindow::receiveEstimateTrend, Qt::QueuedConnection);
+    connect(monitor, &Monitor::sendChannelFlags, this, &MainWindow::receiveChannelFlags, Qt::QueuedConnection);
+    connect(monitor, &Monitor::sendExpectedSpeedState, this, &MainWindow::receiveExpectedSpeedState, Qt::QueuedConnection);
+    monitor_thread->start();
+
     channels = {ui->ch1, ui->ch2, ui->ch3, ui->ch4, ui->ch5, ui->ch6, ui->ch7, ui->ch8};
     ui->sim->setCheckable(true);
     ui->tests->addItems({"Проверка каналов", "Проверка ожидаемой скорости", "Проверка тренда"});
@@ -36,8 +48,8 @@ MainWindow::MainWindow(QWidget *parent)
     channels_plot->graph(ch8)->setPen(QPen(QColor(156, 250, 62), 2));
     channels_plot->graph(ch8)->setName("Channel 8");
 
-    channels_plot->graph(expected)->setPen(QPen(QColor(210, 195, 224), 2));
-    channels_plot->graph(expected)->setName("Real Time");
+    channels_plot->graph(real_time)->setPen(QPen(QColor(210, 195, 224), 2));
+    channels_plot->graph(real_time)->setName("Real Time");
 
     line = new QCPItemLine(channels_plot);
     line->setPen(QPen(QColor(250, 250, 62), 1));
@@ -60,8 +72,6 @@ MainWindow::MainWindow(QWidget *parent)
     line3->end->setCoords(1000, -120);
     line4->start->setCoords(0, -140);
     line4->end->setCoords(1000, -140);
-
-
 
 }
 
@@ -93,11 +103,10 @@ void MainWindow::receiveDataToPlot(const QVector<double>& data)
 
 void MainWindow::receiveValue(double value)
 {
-    static size_t x = 0;
-    channels_plot->graph(expected)->addData(x, value - 130);
-    line->start->setCoords(x, -160);
-    line->end->setCoords(x, 160);
-    x++;
+    channels_plot->graph(my::real_time)->addData(sample_index, value - 130);
+    line->start->setCoords(sample_index, -160);
+    line->end->setCoords(sample_index, 160);
+    sample_index++;
     channels_plot->replot();
 }
 
@@ -115,40 +124,40 @@ void MainWindow::receiveVector(const QVector<double>& data, size_t channel)
 
 void MainWindow::receiveEstimateTrend(bool trend)
 {
-    if(trend) ui->trend->setStyleSheet("QLabel { \
-                                       border: 1px solid #8f8f8f; \
-                                       border-radius: 2px; \
-                                       background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #F92424, stop: 1 #FA7878) }");
-    else ui->trend->setStyleSheet("QLabel { \
-                                  border: 1px solid #8f8f8f; \
-                                  border-radius: 2px; \
-                                  background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #77FF77, stop: 1 #00DD00) }");
+    if(trend) ui->trend->setStyleSheet(QString("QLabel")+crictical_state);
+    else ui->trend->setStyleSheet(QString("QLabel")+normal_state);
 }
 
-void MainWindow::receiveChannelFlags(const QVector<speedState>& channels_speed_state)
+void MainWindow::receiveChannelFlags(const QVector<my::speedState>& channels_speed_state)
 {
     assert(channels_speed_state.size() == channels.size());
     for(auto i=0; i < channels.size(); ++i) {
         switch (channels_speed_state[i]) {
-            case speedState::normal:
-                channels[i]->setStyleSheet("QLabel { \
-                                           border: 1px solid #8f8f8f; \
-                                           border-radius: 2px; \
-                                           background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #00DD00, stop: 1 #77FF77) }");
+            case my::speedState::normal:
+                channels[i]->setStyleSheet(QString("QLabel")+normal_state);
             break;
-            case speedState::warning:
-                channels[i]->setStyleSheet("QLabel { \
-                                           border: 1px solid #8f8f8f; \
-                                           border-radius: 2px; \
-                                           background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #F8D514, stop: 1 #FAE365) }");
+            case my::speedState::warning:
+                channels[i]->setStyleSheet(QString("QLabel")+warning_state);
             break;
-            case speedState::critical:
-                channels[i]->setStyleSheet("QLabel { \
-                                           border: 1px solid #8f8f8f; \
-                                           border-radius: 2px; \
-                                           background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #F92424, stop: 1 #FA7878) }");
+            case my::speedState::critical:
+                channels[i]->setStyleSheet(QString("QLabel")+crictical_state);
             break;
         }
+    }
+}
+
+void MainWindow::receiveExpectedSpeedState(my::speedState state)
+{
+    switch (state) {
+        case my::speedState::normal:
+            ui->expected_speed->setStyleSheet(QString("QLabel")+normal_state);
+        break;
+        case my::speedState::warning:
+            ui->expected_speed->setStyleSheet(QString("QLabel")+warning_state);
+        break;
+        case my::speedState::critical:
+            ui->expected_speed->setStyleSheet(QString("QLabel")+crictical_state);
+        break;
     }
 }
 
@@ -192,28 +201,21 @@ void MainWindow::initPlot(QCustomPlot* plot) {
     plot->legend->setFont(legendFont);
 }
 
-
-
 void MainWindow::on_sim_clicked(bool checked)
 {
     if(checked) {
-        if(!monitor) {
-            monitor = new Monitor();
-            monitor->moveToThread(monitor_thread);
-            connect(monitor_thread, &QThread::started, monitor, &Monitor::start);
-            connect(monitor, &Monitor::sendValue, this, &MainWindow::receiveValue, Qt::QueuedConnection);
-            connect(monitor, &Monitor::sendVector, this, &MainWindow::receiveVector, Qt::QueuedConnection);
-            connect(monitor, &Monitor::sendEstimateTrend, this, &MainWindow::receiveEstimateTrend, Qt::QueuedConnection);
-            connect(monitor, &Monitor::sendChannelFlags, this, &MainWindow::receiveChannelFlags, Qt::QueuedConnection);
-            monitor_thread->start();
+        emit monitorStart(ui->tests->currentIndex());
+        for(size_t i = 0; i < CHANNELS+1; ++i) {
+            channels_plot->graph(i)->data()->clear();
         }
+        sample_index = 0;
+        ui->sim->setText("Остановить симуляцию");
+        ui->sim->setStyleSheet(QString("QPushButton")+normal_state);
 
-        ui->sim->setStyleSheet("QPushButton { \
-                               border: 1px solid #8f8f8f; \
-                               border-radius: 2px; \
-                               background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #77FF77, stop: 1 #00DD00) }");
     }
     else{
+        emit monitorStop();
+        ui->sim->setText("Начать симуляцию");
         ui->sim->setStyleSheet("");
     }
 }
