@@ -24,7 +24,7 @@ Monitor::Monitor():timer(new QTimer(this))
     channels_flags.resize(CHANNELS);
 }
 
-void Monitor::generateSim1Data()
+void Monitor::generateSim1Data() //Check channels
 {
     using namespace my;
     sensorChannelsInput.resize(8);
@@ -40,9 +40,13 @@ void Monitor::generateSim1Data()
     generateTrend(sensorChannelsInput[ch5], 10, 200, 400);
     generateTrend(sensorChannelsInput[ch5], -10, 401, 600);
     sensorChannelsInput[ch5][200] = 10;
+
+    expectedSpeedData.resize(BUFFER_SIZE);
+    expectedSpeedData.fill(0);
+    generateData(expectedSpeedData, 0.5);
 }
 
-void Monitor::generateSim2Data()
+void Monitor::generateSim2Data() //Check expected speed
 {     
     sensorChannelsInput.resize(8);
     for(auto& sensor:sensorChannelsInput) {
@@ -51,16 +55,18 @@ void Monitor::generateSim2Data()
     }
     expectedSpeedData.resize(BUFFER_SIZE);
     expectedSpeedData.fill(0);
+    std::fill(std::begin(expectedSpeedData)+100, std::begin(expectedSpeedData)+300, 6);
+    std::fill(std::begin(expectedSpeedData)+301, std::begin(expectedSpeedData)+500, 15);
     generateData(expectedSpeedData, 0.5);
 }
 
-void Monitor::generateSim3Data()
+void Monitor::generateSim3Data() //Check trend
 {
     sensorChannelsInput.resize(8);
     for(auto& sensor:sensorChannelsInput) {
         sensor.resize(BUFFER_SIZE);
         generateData(sensor, 0.5);
-        generateTrend(sensor, 10, 0, BUFFER_SIZE);
+        generateTrend(sensor, 10, 0, 400);
     }
 }
 
@@ -86,20 +92,22 @@ void Monitor::update()
         switch (_typeSimulatiion) {
             case channelsSpeed:
                 emit sendValue(filtered_data[ch2]);
+                estimateChannelsSpeed(filtered_data, average_channels);
             break;
             case expectedSpeed:
                 estimateExpectedSpeed(expectedSpeedData[cycle_index], average_channels);
                 emit sendValue(expectedSpeedData[cycle_index]);
+                emit sendExpectedSpeedState(expected_speed_state);
             break;
             case trend:
                 estimateDataTrend(average_channels);
+                estimateChannelsSpeed(filtered_data, expectedSpeedData[cycle_index]);
                 emit sendValue(average_channels);
             break;
             default:
             break;
         }
 
-        estimateChannelsSpeed(filtered_data, average_channels);
         emit sendChannelFlags(channels_flags);
 
         ++cycle_index;
@@ -182,8 +190,6 @@ void Monitor::estimateChannelsSpeed(QVector<double>& channelsSpeed, double avera
 
 void Monitor::estimateExpectedSpeed(double expectedSpeed, double average)
 {
-    auto start = std::chrono::steady_clock::now();
-    start = std::chrono::steady_clock::now();
     if(std::abs(expectedSpeed-average) > critical_treshold_exp) {
         expected_speed_state = my::speedState::critical;
     }
@@ -192,9 +198,6 @@ void Monitor::estimateExpectedSpeed(double expectedSpeed, double average)
     }
     else
         expected_speed_state = my::speedState::normal;
-    auto end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end-start;
-    qDebug() << "elapsed time: " << elapsed_seconds.count();
 }
 
 double Monitor::medianFilter(double value, size_t channel)
