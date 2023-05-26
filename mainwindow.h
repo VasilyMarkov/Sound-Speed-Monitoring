@@ -18,7 +18,6 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 public slots:
-    void receiveDataToPlot(const QVector<double>&);
     void receiveValue(double);
     void receiveVector(const QVector<double>&, size_t);
     void receiveEstimateTrend(bool);
@@ -26,6 +25,10 @@ public slots:
     void receiveExpectedSpeedState(my::speedState);
 private slots:
     void on_sim_clicked(bool checked);
+    void on_set_tresholds_ch_clicked();
+
+    void on_set_tresholds_exp_clicked();
+
 private:
     Ui::MainWindow *ui;
     QVector<QLabel*> channels;
@@ -34,11 +37,11 @@ private:
     QMutex* mutex;
     QCustomPlot* channels_plot;
     QCPItemLine* line;
-    QCPItemLine* line1;
-    QCPItemLine* line2;
-    QCPItemLine* line3;
-    QCPItemLine* line4;
-
+    QCPItemLine* upper_warning_line;
+    QCPItemLine* lower_warning_line;
+    QCPItemLine* upper_critical_line;
+    QCPItemLine* lower_critical_line;
+    QCPItemLine* x_axis;
     size_t sample_index{0};
     void initPlot(QCustomPlot*);
     const QString normal_state{"{border: 1px solid #8f8f8f; \
@@ -55,5 +58,6 @@ private:
 signals:
     emit void monitorStart(int);
     emit void monitorStop();
+    emit void setTresholds(double, int);
 };
 #endif // MAINWINDOW_H

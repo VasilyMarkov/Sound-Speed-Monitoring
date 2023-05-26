@@ -2,6 +2,8 @@
 #include "algorithm"
 #include "math.h"
 #include <QRandomGenerator>
+#include <chrono>
+
 Monitor::Monitor():timer(new QTimer(this))
 {
     connect(timer, &QTimer::timeout, this, &Monitor::update);
@@ -9,6 +11,7 @@ Monitor::Monitor():timer(new QTimer(this))
     qRegisterMetaType<QVector<my::speedState>>();
     qRegisterMetaType<my::typeSimulation>();
     qRegisterMetaType<my::speedState>();
+    qRegisterMetaType<my::typeTreshold>();
     x_buffer.resize(50);
     buffer.resize(50);
     std::iota(std::begin(x_buffer), std::end(x_buffer), 0);
@@ -65,18 +68,18 @@ void Monitor::update()
 {
     using namespace my;
     try {
-        if(index == BUFFER_SIZE-1) timer->stop();
+        if(cycle_index == BUFFER_SIZE-1) timer->stop();
 
         QMutexLocker locker(&mutex);
 
-        QVector<double> filtered_data = {medianFilter(sensorChannelsInput[ch1][index], ch1),
-                                         medianFilter(sensorChannelsInput[ch2][index], ch2),
-                                         medianFilter(sensorChannelsInput[ch3][index], ch3),
-                                         medianFilter(sensorChannelsInput[ch4][index], ch4),
-                                         medianFilter(sensorChannelsInput[ch5][index], ch5),
-                                         medianFilter(sensorChannelsInput[ch6][index], ch6),
-                                         medianFilter(sensorChannelsInput[ch7][index], ch7),
-                                         medianFilter(sensorChannelsInput[ch8][index], ch8)};
+        QVector<double> filtered_data = {medianFilter(sensorChannelsInput[ch1][cycle_index], ch1),
+                                         medianFilter(sensorChannelsInput[ch2][cycle_index], ch2),
+                                         medianFilter(sensorChannelsInput[ch3][cycle_index], ch3),
+                                         medianFilter(sensorChannelsInput[ch4][cycle_index], ch4),
+                                         medianFilter(sensorChannelsInput[ch5][cycle_index], ch5),
+                                         medianFilter(sensorChannelsInput[ch6][cycle_index], ch6),
+                                         medianFilter(sensorChannelsInput[ch7][cycle_index], ch7),
+                                         medianFilter(sensorChannelsInput[ch8][cycle_index], ch8)};
 
         average_channels = std::accumulate(std::begin(filtered_data), std::end(filtered_data), 0.0)/CHANNELS;
 
@@ -85,8 +88,8 @@ void Monitor::update()
                 emit sendValue(filtered_data[ch2]);
             break;
             case expectedSpeed:
-                estimateExpectedSpeed(expectedSpeedData[index], average_channels);
-                emit sendValue(expectedSpeedData[index]);
+                estimateExpectedSpeed(expectedSpeedData[cycle_index], average_channels);
+                emit sendValue(expectedSpeedData[cycle_index]);
             break;
             case trend:
                 estimateDataTrend(average_channels);
@@ -99,11 +102,11 @@ void Monitor::update()
         estimateChannelsSpeed(filtered_data, average_channels);
         emit sendChannelFlags(channels_flags);
 
-        ++index;
+        ++cycle_index;
     }
     catch (my::Exception& excep) {
         timer->stop();
-        index = 0;
+        cycle_index = 0;
         qCritical() << excep.what();
     }
 }
@@ -132,7 +135,6 @@ bool Monitor::estimateDataTrend(double value) {
     if(cnt == 49) {
         QVector<double> y_fit(50);
         avg_fit = leastSquares(buffer, x_buffer, y_fit);
-        qDebug() << avg_fit;
         if(std::abs(avg_fit) > trend_treshold) trend_detection = true;
         else
             trend_detection = false;
@@ -167,10 +169,10 @@ void Monitor::generateData(QVector<double>& data, double variance)
 void Monitor::estimateChannelsSpeed(QVector<double>& channelsSpeed, double average)
 {
     for(auto i = 0; i < channelsSpeed.size(); ++i) {
-        if(std::abs(channelsSpeed[i]-average) > 10) {
+        if(std::abs(channelsSpeed[i]-average) > critical_treshold_ch) {
             channels_flags[i] = my::speedState::critical;
         }
-        else if(std::abs(channelsSpeed[i]-average) > 5) {
+        else if(std::abs(channelsSpeed[i]-average) > warning_treshold_ch) {
             channels_flags[i] = my::speedState::warning;
         }
         else
@@ -180,14 +182,19 @@ void Monitor::estimateChannelsSpeed(QVector<double>& channelsSpeed, double avera
 
 void Monitor::estimateExpectedSpeed(double expectedSpeed, double average)
 {
-    if(std::abs(expectedSpeed-average) > 10) {
+    auto start = std::chrono::steady_clock::now();
+    start = std::chrono::steady_clock::now();
+    if(std::abs(expectedSpeed-average) > critical_treshold_exp) {
         expected_speed_state = my::speedState::critical;
     }
-    else if(std::abs(expectedSpeed-average) > 5) {
+    else if(std::abs(expectedSpeed-average) > warning_treshold_exp) {
         expected_speed_state = my::speedState::warning;
     }
     else
         expected_speed_state = my::speedState::normal;
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end-start;
+    qDebug() << "elapsed time: " << elapsed_seconds.count();
 }
 
 double Monitor::medianFilter(double value, size_t channel)
@@ -229,6 +236,26 @@ void Monitor::start(int typeSim)
 
 void Monitor::stop()
 {
-    index = 0;
+    cycle_index = 0;
     timer->stop();
+}
+
+void Monitor::setTresholds(double treshold, int type)
+{
+    switch (type) {
+        case my::typeTreshold::warning_channel:
+            warning_treshold_ch = treshold;
+        break;
+        case my::typeTreshold::critical_channel:
+            critical_treshold_ch = treshold;
+        break;
+        case my::typeTreshold::warning_expected:
+            warning_treshold_exp = treshold;
+        break;
+        case my::typeTreshold::critical_expected:
+            critical_treshold_exp = treshold;
+        break;
+        default:
+        break;
+    }
 }

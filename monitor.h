@@ -10,7 +10,6 @@
 
 constexpr size_t BUFFER_SIZE = 1000;
 constexpr size_t CHANNELS = 8;
-constexpr double EXPECTED_SPEED = 500; // м/с
 constexpr double WARNING_THRESHOLD = 5; // м/с
 constexpr double DANGER_THRESHOLD = 10; // м/с
 
@@ -48,6 +47,12 @@ namespace my {
         expectedSpeed,
         trend
     };
+    enum typeTreshold {
+        warning_channel,
+        critical_channel,
+        warning_expected,
+        critical_expected
+    };
 }
 
 class Monitor: public QObject
@@ -56,21 +61,24 @@ class Monitor: public QObject
 private:
     QTimer* timer;
     QMutex mutex;
+    const double trend_treshold{0.002};
+
+    double warning_treshold_ch{5};
+    double critical_treshold_ch{10};
+    double warning_treshold_exp{5};
+    double critical_treshold_exp{10};
+
     QVector<QVector<double>> sensorChannelsInput; //Канальные скорости от датчиков
     QVector<double> expectedSpeedData; // Ожидаемая скорость
-    double expectedSpeedInput;
-    std::array<double, BUFFER_SIZE> average_speed_of_sound_;
-    size_t index{0};
+    size_t cycle_index{0};
     QVector<double> x_buffer;
     QVector<double> buffer;
-    QVector<double> y_fit_test;
     QVector<QVector<double>> channels_buffer;
     QVector<QVector<double>> median_filter;
     QVector<my::speedState> channels_flags;
     my::speedState expected_speed_state;
     int _typeSimulatiion;
-    double avg_fit{0};
-    const double trend_treshold{0.002};
+    double avg_fit{0};    
     double average_channels{0};
     void generateSim1Data();
     void generateSim2Data();
@@ -82,12 +90,12 @@ private:
     void estimateChannelsSpeed(QVector<double>&, double);
     void estimateExpectedSpeed(double, double);
     double medianFilter(double, size_t);
-
 private slots:
     void update();
 public slots:
     void start(int);
     void stop();
+    void setTresholds(double, int);
 public:
     Monitor();
 signals:
@@ -103,4 +111,5 @@ Q_DECLARE_METATYPE(QVector<QVector<double>>)
 Q_DECLARE_METATYPE(QVector<my::speedState>)
 Q_DECLARE_METATYPE(my::typeSimulation)
 Q_DECLARE_METATYPE(my::speedState)
+Q_DECLARE_METATYPE(my::typeTreshold)
 #endif // MONITOR_H

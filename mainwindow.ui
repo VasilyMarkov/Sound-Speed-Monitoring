@@ -23,7 +23,7 @@
       <property name="title">
        <string>GroupBox</string>
       </property>
-      <layout class="QVBoxLayout" name="verticalLayout" stretch="1,1,1,8">
+      <layout class="QVBoxLayout" name="verticalLayout" stretch="1,0,1,1,8">
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_5">
          <item>
@@ -52,6 +52,103 @@
         </layout>
        </item>
        <item>
+        <widget class="QGroupBox" name="groupBox_3">
+         <property name="title">
+          <string>Установка ограничений </string>
+         </property>
+         <layout class="QHBoxLayout" name="horizontalLayout_10">
+          <item>
+           <widget class="QGroupBox" name="groupBox_4">
+            <property name="title">
+             <string>Канальные скоростей</string>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_2">
+             <item>
+              <layout class="QHBoxLayout" name="horizontalLayout_6" stretch="1,2">
+               <item>
+                <widget class="QLabel" name="label_10">
+                 <property name="text">
+                  <string>Warn:</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="warning_ch"/>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QHBoxLayout" name="horizontalLayout_7" stretch="1,2">
+               <item>
+                <widget class="QLabel" name="label_11">
+                 <property name="text">
+                  <string>Crit:</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="critical_ch"/>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <widget class="QPushButton" name="set_tresholds_ch">
+               <property name="text">
+                <string>Установить</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_5">
+            <property name="title">
+             <string>Ожидаемая скорость</string>
+            </property>
+            <layout class="QVBoxLayout" name="verticalLayout_3">
+             <item>
+              <layout class="QHBoxLayout" name="horizontalLayout_8" stretch="1,2">
+               <item>
+                <widget class="QLabel" name="label_12">
+                 <property name="text">
+                  <string>Warn:</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="warning_exp"/>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QHBoxLayout" name="horizontalLayout_9" stretch="1,2">
+               <item>
+                <widget class="QLabel" name="label_13">
+                 <property name="text">
+                  <string>Crit:</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="critical_exp"/>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <widget class="QPushButton" name="set_tresholds_exp">
+               <property name="text">
+                <string>Установить</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
         <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="1,1">
          <item>
           <widget class="QLabel" name="trend_2">
@@ -65,6 +162,9 @@
          </item>
          <item>
           <widget class="QLabel" name="trend">
+           <property name="frameShape">
+            <enum>QFrame::Box</enum>
+           </property>
            <property name="text">
             <string/>
            </property>
@@ -328,7 +428,7 @@
      <x>0</x>
      <y>0</y>
      <width>1227</width>
-     <height>21</height>
+     <height>20</height>
     </rect>
    </property>
   </widget>
