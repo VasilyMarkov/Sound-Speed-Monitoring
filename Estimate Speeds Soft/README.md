@@ -1,4 +1,4 @@
-# Sound-Speed-Monitoring
+# Sound-Speed-Monitoring build for Win
 
 
 ![image](https://github.com/VasilyMarkov/Sound-Speed-Monitoring/assets/69464900/6faa48a4-7b64-4959-b493-ea1810954b47)
